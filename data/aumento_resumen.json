@@ -1,0 +1,23 @@
+{
+  "filas_reales": 143309,
+  "seed": 42,
+  "personas": 139526,
+  "train_real": {
+    "filas": 114665,
+    "fallecidos": 29726,
+    "tasa": 0.2592
+  },
+  "test": {
+    "filas": 28644,
+    "fallecidos": 7574,
+    "tasa": 0.2644
+  },
+  "train_aumentado": {
+    "filas": 1050000,
+    "sinteticas": 935335,
+    "reales": 114665,
+    "fallecidos": 272204,
+    "tasa": 0.2592,
+    "ruido": "edad +-2 anios; resto de columnas intactas"
+  }
+}
