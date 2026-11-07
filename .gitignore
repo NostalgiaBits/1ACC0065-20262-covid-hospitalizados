@@ -1,7 +1,9 @@
 # datos: solo se versiona data/muestra_1000.csv y data/codebook.json
-data/raw/
+data/raw/*
+!data/raw/TB_HOSP_VAC_FALLECIDOS.csv
 data/*.csv
 !data/muestra_1000.csv
+!data/train_1M.csv
 docs/evidencia/
 
 # binarios y entornos
