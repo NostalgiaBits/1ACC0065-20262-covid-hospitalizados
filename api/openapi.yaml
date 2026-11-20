@@ -1,0 +1,216 @@
+openapi: 3.0.3
+info:
+  title: API de riesgo de fallecimiento en hospitalizados por COVID-19
+  version: "2.0"
+  description: |
+    API coordinadora del Trabajo Final CC65 (UPC, 2026-20). Expone el modelo de regresión logística entrenado de forma
+    distribuida en un clúster de nodos Go por TCP (topología en estrella), con MongoDB como persistencia y Redis como caché.
+    La predicción apoya la priorización de recursos; no reemplaza el juicio clínico ni debe usarse para negar atención.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Predicción
+  - name: Cluster
+  - name: Usuarios
+  - name: Consultas
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: "JSON invalido" }
+    Paciente:
+      type: object
+      required: [edad, sexo, dosis_previas, departamento, periodo]
+      properties:
+        edad: { type: integer, minimum: 0, maximum: 110, example: 72 }
+        sexo: { type: string, enum: [F, M], example: M }
+        dosis_previas: { type: integer, minimum: 0, description: "dosis aplicadas al menos 14 días antes del ingreso (3 o más = 3)", example: 0 }
+        fabricante: { type: string, enum: [NINGUNA, PFIZER, SINOPHARM, ASTRAZENECA, OTRO], example: NINGUNA }
+        departamento: { type: string, example: LIMA }
+        periodo: { type: string, enum: ["2020-S1", "2020-S2", "2021-S1", "2021-S2", "2022+"], example: "2021-S1" }
+    Prediccion:
+      type: object
+      properties:
+        probabilidad: { type: number, example: 0.512 }
+        porcentaje: { type: string, example: "51.2 %" }
+        riesgo: { type: string, enum: [bajo, medio, alto] }
+        prioritario: { type: boolean }
+        umbral: { type: number, example: 0.28 }
+        factores:
+          type: array
+          items:
+            type: object
+            properties:
+              variable: { type: string, example: edad_z }
+              contribucion: { type: number }
+              odds_ratio: { type: number }
+        modelo_version: { type: integer }
+        cache: { type: string, enum: [hit, miss] }
+        latencia_ms: { type: number, example: 0.21 }
+        aviso: { type: string }
+    Credenciales:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, example: medico@hospital.pe }
+        password: { type: string, example: clave-segura-123 }
+    Entrenamiento:
+      type: object
+      properties:
+        version: { type: integer }
+        epocas: { type: integer }
+        tasa: { type: number }
+        nodos_usados: { type: integer }
+        filas: { type: integer }
+        ms: { type: number }
+        ms_por_epoca: { type: number }
+        reasignaciones: { type: integer }
+        perdida_final: { type: number }
+        auc: { type: number }
+        f1: { type: number }
+        nodos:
+          type: array
+          items:
+            type: object
+            properties:
+              dir: { type: string }
+              nodo: { type: string }
+              activo: { type: boolean }
+              peticiones: { type: integer }
+              ms_calculo: { type: number }
+              fallos: { type: integer }
+paths:
+  /salud:
+    get:
+      tags: [Consultas]
+      summary: Estado de la API, MongoDB, Redis y nodos
+      responses:
+        "200": { description: OK }
+  /registro:
+    post:
+      tags: [Usuarios]
+      summary: Registrar un usuario (rol usuario)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/Credenciales"
+                - type: object
+                  properties:
+                    nombre: { type: string, example: "Dra. Pérez" }
+      responses:
+        "201": { description: Creado }
+        "400": { description: Datos inválidos, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: El email ya existe }
+        "415": { description: Content-Type distinto de application/json }
+  /login:
+    post:
+      tags: [Usuarios]
+      summary: Obtener un token JWT (válido 1 hora)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credenciales" }
+      responses:
+        "200":
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  tipo: { type: string, example: Bearer }
+                  expira: { type: string }
+                  rol: { type: string }
+        "401": { description: Credenciales incorrectas }
+  /predecir:
+    post:
+      tags: [Predicción]
+      summary: Probabilidad de fallecimiento de un paciente al ingreso (objetivo < 100 ms)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Paciente" }
+      responses:
+        "200":
+          description: Predicción (cabecera X-Latencia-ms con el tiempo de servidor)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Prediccion" }
+        "400": { description: Campos faltantes o fuera de rango }
+        "405": { description: Método no permitido }
+        "415": { description: Content-Type distinto de application/json }
+  /entrenar:
+    post:
+      tags: [Cluster]
+      summary: Entrenar el modelo en el clúster TCP (requiere rol admin)
+      security: [{ bearer: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                epocas: { type: integer, default: 100, minimum: 1, maximum: 2000 }
+                tasa: { type: number, default: 1.0 }
+                nodos: { type: integer, default: 3, minimum: 1, maximum: 3 }
+      responses:
+        "200":
+          description: Modelo nuevo activado; métricas sobre la prueba real
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entrenamiento" }
+        "400": { description: Parámetros inválidos }
+        "401": { description: Falta el token o es inválido }
+        "403": { description: Se requiere rol admin }
+        "409": { description: Ya hay un entrenamiento en curso }
+        "503": { description: Ningún nodo disponible }
+  /modelo:
+    get:
+      tags: [Consultas]
+      summary: Modelo vigente, odds ratios, métricas y categorías válidas
+      responses:
+        "200": { description: OK }
+  /cluster:
+    get:
+      tags: [Cluster]
+      summary: Topología y estado de cada nodo
+      responses:
+        "200": { description: OK }
+  /metricas:
+    get:
+      tags: [Consultas]
+      summary: Latencias de /predecir (p50, p95, p99), caché y conteos de MongoDB y Redis
+      responses:
+        "200": { description: OK }
+  /entrenamientos:
+    get:
+      tags: [Consultas]
+      summary: Historial de entrenamientos (MongoDB)
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: limite, in: query, schema: { type: integer, default: 20, maximum: 200 } }
+      responses:
+        "200": { description: OK }
+        "401": { description: Falta el token }
+  /predicciones:
+    get:
+      tags: [Consultas]
+      summary: Últimas predicciones registradas (MongoDB)
+      security: [{ bearer: [] }]
+      parameters:
+        - { name: limite, in: query, schema: { type: integer, default: 20, maximum: 200 } }
+      responses:
+        "200": { description: OK }
+        "401": { description: Falta el token }
