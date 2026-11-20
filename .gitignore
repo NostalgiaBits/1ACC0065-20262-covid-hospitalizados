@@ -4,6 +4,7 @@ data/raw/*
 data/*.csv
 !data/muestra_1000.csv
 !data/train_1M.csv
+!data/test.csv
 docs/evidencia/
 
 # binarios y entornos
