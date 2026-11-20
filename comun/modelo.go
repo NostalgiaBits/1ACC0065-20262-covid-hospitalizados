@@ -38,16 +38,53 @@ func gradienteParcial(X [][]float64, Y, w []float64, ini, fin, indice int, salid
 	salida <- parcial{indice, grad, perdida}
 }
 
+// gradiente de las filas [ini, fin) repartido entre W goroutines; suma en orden fijo
+func GradienteParalelo(d *Datos, w []float64, ini, fin, workers int) ([]float64, float64) {
+	if workers < 1 {
+		workers = 1
+	}
+	parciales := make(chan parcial, workers)
+	var wg sync.WaitGroup
+	tam := (fin - ini + workers - 1) / workers
+	for k := 0; k < workers; k++ {
+		a := ini + k*tam
+		b := a + tam
+		if a > fin {
+			a = fin
+		}
+		if b > fin {
+			b = fin
+		}
+		wg.Add(1)
+		go gradienteParcial(d.X, d.Y, w, a, b, k, parciales, &wg)
+	}
+	go func() { wg.Wait(); close(parciales) }()
+
+	grads := make([][]float64, workers)
+	perdidas := make([]float64, workers)
+	for p := range parciales {
+		grads[p.indice] = p.grad
+		perdidas[p.indice] = p.perdida
+	}
+	suma := make([]float64, len(w))
+	perdida := 0.0
+	for k := 0; k < workers; k++ { // orden fijo para que el resultado sea el mismo con cualquier W
+		for j := range suma {
+			suma[j] += grads[k][j]
+		}
+		perdida += perdidas[k]
+	}
+	return suma, perdida
+}
+
 // descenso de gradiente con W workers por iteracion; lote = 0 usa todo el conjunto
 func Entrenar(d *Datos, workers, epocas int, tasa float64, lote int, informe func(epoca int, perdida float64)) ([]float64, []float64) {
 	n := len(d.X)
-	dim := len(d.Nombres)
-	w := make([]float64, dim)
+	w := make([]float64, len(d.Nombres))
 	if lote <= 0 || lote > n {
 		lote = n
 	}
 	perdidas := make([]float64, 0, epocas)
-	suma := make([]float64, dim)
 	for e := 0; e < epocas; e++ {
 		perdidaEpoca := 0.0
 		for ini := 0; ini < n; ini += lote {
@@ -55,36 +92,8 @@ func Entrenar(d *Datos, workers, epocas int, tasa float64, lote int, informe fun
 			if fin > n {
 				fin = n
 			}
-			parciales := make(chan parcial, workers)
-			var wg sync.WaitGroup
-			tam := (fin - ini + workers - 1) / workers
-			for k := 0; k < workers; k++ {
-				a := ini + k*tam
-				b := a + tam
-				if a > fin {
-					a = fin
-				}
-				if b > fin {
-					b = fin
-				}
-				wg.Add(1)
-				go gradienteParcial(d.X, d.Y, w, a, b, k, parciales, &wg)
-			}
-			go func() { wg.Wait(); close(parciales) }()
-
-			grads := make([][]float64, workers)
-			for p := range parciales {
-				grads[p.indice] = p.grad
-				perdidaEpoca += p.perdida
-			}
-			for j := range suma {
-				suma[j] = 0
-			}
-			for k := 0; k < workers; k++ { // orden fijo para que el resultado sea el mismo con cualquier W
-				for j := range suma {
-					suma[j] += grads[k][j]
-				}
-			}
+			suma, perdida := GradienteParalelo(d, w, ini, fin, workers)
+			perdidaEpoca += perdida
 			m := float64(fin - ini)
 			for j := range w {
 				w[j] -= tasa * suma[j] / m

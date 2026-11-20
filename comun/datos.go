@@ -260,3 +260,25 @@ func CargarCSVBloques(ruta string, cb *Codebook, workers, tamBloque int) (*Datos
 	}
 	return datos, nil
 }
+
+type Paciente struct {
+	Edad         int    `json:"edad"`
+	Sexo         string `json:"sexo"`
+	DosisPrevias int    `json:"dosis_previas"`
+	Fabricante   string `json:"fabricante"`
+	Departamento string `json:"departamento"`
+	Periodo      string `json:"periodo"`
+}
+
+func (cb *Codebook) CodificarPaciente(p Paciente, x []float64) error {
+	if p.DosisPrevias > len(cb.Dosis)-1 {
+		p.DosisPrevias = len(cb.Dosis) - 1
+	}
+	if p.Fabricante == "" {
+		p.Fabricante = cb.Fabricante[0]
+	}
+	linea := fmt.Sprintf("0,%d,%s,%d,%s,%s,%s,0", p.Edad, strings.ToUpper(p.Sexo), p.DosisPrevias,
+		strings.ToUpper(p.Fabricante), strings.ToUpper(p.Departamento), strings.ToUpper(p.Periodo))
+	_, err := cb.Codificar(linea, x)
+	return err
+}
