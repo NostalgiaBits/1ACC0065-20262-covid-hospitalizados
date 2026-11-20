@@ -1,0 +1,98 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_datos:/data/db
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.20
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.21
+  nodo1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROGRAMA: nodo
+    environment:
+      NODO_ID: nodo1
+      WORKERS: "4"
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "19091:9091"
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.2
+  nodo2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROGRAMA: nodo
+    environment:
+      NODO_ID: nodo2
+      WORKERS: "4"
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "29091:9091"
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.3
+  nodo3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROGRAMA: nodo
+    environment:
+      NODO_ID: nodo3
+      WORKERS: "4"
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "39091:9091"
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.4
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PROGRAMA: api
+    env_file: .env
+    environment:
+      NODOS: "172.20.0.2:9091,172.20.0.3:9091,172.20.0.4:9091"
+      MONGO_URI: mongodb://172.20.0.20:27017
+      MONGO_DB: covid
+      REDIS_ADDR: 172.20.0.21:6379
+    volumes:
+      - ./data:/app/data:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mongo
+      - redis
+      - nodo1
+      - nodo2
+      - nodo3
+    networks:
+      my_network:
+        ipv4_address: 172.20.0.10
+networks:
+  my_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "172.20.0.0/24"
+volumes:
+  mongo_datos:

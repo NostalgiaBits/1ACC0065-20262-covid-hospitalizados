@@ -15,3 +15,6 @@ __pycache__/
 
 # salidas del benchmark (se regeneran)
 bench/salidas/
+
+# secretos locales
+.env

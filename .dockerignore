@@ -1,0 +1,10 @@
+.git
+.env
+bin
+data
+docs
+python
+postman
+venv
+bench/salidas
+*.exe
