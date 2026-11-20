@@ -1,0 +1,99 @@
+{
+  "filas_original": 155345,
+  "columnas_original": 42,
+  "columnas_fuga": [
+    "flag_uci",
+    "fecha_ingreso_uci",
+    "fecha_ingreso_ucin",
+    "con_oxigeno",
+    "con_ventilacion",
+    "fecha_segumiento_hosp_ultimo",
+    "evolucion_hosp_ultimo",
+    "cdc_fecha_fallecido_covid",
+    "flag_vacuna"
+  ],
+  "columnas_sin_info": [
+    "cdc_positividad",
+    "eess_renaes",
+    "eess_diresa",
+    "eess_red",
+    "eess_nombre",
+    "id_eess",
+    "ubigeo_inei_domicilio",
+    "prov_domicilio",
+    "dist_domicilio"
+  ],
+  "sin_edad": 11538,
+  "sin_sexo": 10148,
+  "sin_fecha_ingreso": 0,
+  "filas_eliminadas_nulos": 12036,
+  "filas_tras_nulos": 143309,
+  "dosis_previas": {
+    "0": 119670,
+    "1": 4436,
+    "2": 12735,
+    "3": 6468
+  },
+  "mortalidad_por_dosis_previas": {
+    "0": 0.2915,
+    "1": 0.1506,
+    "2": 0.1075,
+    "3": 0.0594
+  },
+  "periodo": {
+    "2020-S1": 14103,
+    "2020-S2": 38102,
+    "2021-S1": 55533,
+    "2021-S2": 15208,
+    "2022+": 20363
+  },
+  "mortalidad_por_periodo": {
+    "2020-S1": 0.4227,
+    "2020-S2": 0.2396,
+    "2021-S1": 0.3367,
+    "2021-S2": 0.117,
+    "2022+": 0.085
+  },
+  "filas_final": 143309,
+  "personas_unicas": 139526,
+  "fallecidos": 37300,
+  "tasa_fallecidos": 0.2603,
+  "mortalidad_por_sexo": {
+    "F": 0.1929,
+    "M": 0.3223
+  },
+  "mortalidad_por_edad": {
+    "0-30": 0.0211,
+    "31-45": 0.0661,
+    "46-60": 0.2236,
+    "61-75": 0.3886,
+    "76+": 0.5152
+  },
+  "mortalidad_por_departamento": {
+    "CALLAO": 0.4519,
+    "TUMBES": 0.3835,
+    "TACNA": 0.3818,
+    "ICA": 0.3708,
+    "LAMBAYEQUE": 0.3633,
+    "PIURA": 0.3179,
+    "JUNIN": 0.3095,
+    "APURIMAC": 0.261,
+    "ANCASH": 0.2574,
+    "MADRE DE DIOS": 0.2539,
+    "LIMA": 0.248,
+    "MOQUEGUA": 0.2431,
+    "CAJAMARCA": 0.2337,
+    "AMAZONAS": 0.2286,
+    "CUSCO": 0.2199,
+    "SAN MARTIN": 0.2093,
+    "HUANCAVELICA": 0.1927,
+    "PUNO": 0.1881,
+    "UCAYALI": 0.1845,
+    "AREQUIPA": 0.1587,
+    "HUANUCO": 0.1416,
+    "PASCO": 0.1402,
+    "LA LIBERTAD": 0.1356,
+    "AYACUCHO": 0.1278,
+    "LORETO": 0.103
+  }
+}

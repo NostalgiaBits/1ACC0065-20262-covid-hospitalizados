@@ -1,0 +1,67 @@
+{
+  "columnas_csv": [
+    "id_persona",
+    "edad",
+    "sexo",
+    "dosis_previas",
+    "fabricante",
+    "departamento",
+    "periodo",
+    "fallecido"
+  ],
+  "sexo": [
+    "F",
+    "M"
+  ],
+  "dosis_previas": [
+    "0",
+    "1",
+    "2",
+    "3+"
+  ],
+  "fabricante": [
+    "NINGUNA",
+    "PFIZER",
+    "SINOPHARM",
+    "ASTRAZENECA",
+    "OTRO"
+  ],
+  "departamento": [
+    "LIMA",
+    "AMAZONAS",
+    "ANCASH",
+    "APURIMAC",
+    "AREQUIPA",
+    "AYACUCHO",
+    "CAJAMARCA",
+    "CALLAO",
+    "CUSCO",
+    "HUANCAVELICA",
+    "HUANUCO",
+    "ICA",
+    "JUNIN",
+    "LA LIBERTAD",
+    "LAMBAYEQUE",
+    "LORETO",
+    "MADRE DE DIOS",
+    "MOQUEGUA",
+    "PASCO",
+    "PIURA",
+    "PUNO",
+    "SAN MARTIN",
+    "TACNA",
+    "TUMBES",
+    "UCAYALI"
+  ],
+  "periodo": [
+    "2020-S1",
+    "2020-S2",
+    "2021-S1",
+    "2021-S2",
+    "2022+"
+  ],
+  "edad_min": 0,
+  "edad_max": 110,
+  "edad_media": 55.1997,
+  "edad_desv": 21.2827
+}
