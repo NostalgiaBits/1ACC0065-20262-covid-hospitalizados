@@ -18,24 +18,23 @@
 | 20/11 | Luis Enrique | Protocolo TCP, coordinador del clúster, nodo ML y lanzador; pruebas de equivalencia y de nodo caído | | Hecho |
 | 20/11 | Luis Enrique | API REST: predicción con caché, entrenamiento distribuido, JWT y bcrypt, MongoDB, Redis, OpenAPI | | Hecho |
 | 20/11 | Luis Enrique | Dockerfile, docker-compose (3 nodos, API, MongoDB, Redis), benchmark por nodos y prueba de carga | | Hecho |
-| 21/11 | Luis David | Colección de Postman, ejecución en Docker y capturas (Runner con 50 iteraciones) | | |
-| 21/11 | Lizbeth | README del Entregable 2 | | |
-| 21/11 | Todos | Revisión del informe, PR `develop → main`, release `pc4` y entrega | | |
+| 21/11 | Luis David | Colección de Postman, ejecución en Docker y capturas (Runner con 50 iteraciones) | Hecho |
+| 21/11 | Lizbeth | README del Entregable 2 | Hecho |
+| 21/11 | Todos | Revisión del informe, PR `develop → main`, release `pc4` y entrega | Hecho |
 
 ## 3. Reuniones
 
 | Fecha | Medio | Asistentes | Acuerdos |
 |---|---|---|---|
-| | | | Topología en estrella (parameter server); Docker Compose con IPs fijas como en la clase de la semana 12 |
-| | | | Reparto: código Go y Docker (Luis Enrique), Postman y gestión (Luis David), README (Lizbeth) |
+|15/11 |Discord | Todos los integrantes| Topología en estrella (parameter server); Docker Compose con IPs fijas como en la clase de la semana 12 |
+| 19/11|Google Meets |Todos los integrantes | Reparto: código Go y Docker (Luis Enrique), Postman y gestión (Luis David), README (Lizbeth) |
 
 ## 4. Autoevaluación (1–5)
 
 | Criterio | Luis Enrique | Luis David | Lizbeth |
 |---|---|---|---|
-| Cumplimiento de las tareas asignadas | | | |
-| Puntualidad en las entregas internas | | | |
-| Comunicación con el equipo | | | |
-| Calidad del trabajo entregado | | | |
+| Cumplimiento de las tareas asignadas |20 |20 |20 |
+| Puntualidad en las entregas internas |20 |20 |20 |
+| Comunicación con el equipo |20 |20 |20 |
+| Calidad del trabajo entregado |20 |20 |20 |
 
-Observaciones del coordinador:
