@@ -1,0 +1,1090 @@
+{
+  "info": {
+    "name": "CC65 TF · PC4 · API COVID hospitalizados",
+    "description": "Pruebas de la API coordinadora (Go): predicción < 100 ms con caché Redis, usuarios con JWT, entrenamiento distribuido en el clúster TCP y consultas a MongoDB. Ejecutar en orden (Run collection); para la prueba de latencia, ejecutar la carpeta 3 con 50 iteraciones.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Estado del sistema",
+      "item": [
+        {
+          "name": "Salud",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"API en línea\", () => pm.expect(r.estado).to.eql(\"ok\"));",
+                  "pm.test(\"MongoDB y Redis conectados\", () => { pm.expect(r.mongo).to.be.true; pm.expect(r.redis).to.be.true; });",
+                  "pm.test(\"3 nodos activos\", () => pm.expect(r.nodos_activos).to.eql(3));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/salud",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salud"
+              ]
+            },
+            "description": "Estado de la API, MongoDB, Redis y de los nodos del clúster."
+          }
+        },
+        {
+          "name": "Modelo vigente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "const r = pm.response.json();",
+                  "pm.collectionVariables.set(\"versionInicial\", r.version);",
+                  "pm.test(\"38 pesos y categorías válidas\", () => { pm.expect(r.pesos).to.have.lengthOf(38); pm.expect(r.categorias.departamento).to.include(\"LIMA\"); });",
+                  "pm.test(\"AUC sobre la prueba real > 0.8\", () => pm.expect(r[\"metricas_umbral_0.5\"].auc).to.be.above(0.8));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": "Pesos, odds ratios, métricas y categorías aceptadas por /predecir."
+          }
+        },
+        {
+          "name": "Clúster",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Topología en estrella\", () => pm.expect(r.topologia).to.include(\"estrella\"));",
+                  "pm.test(\"Cada nodo tiene el dataset de 1 050 000 filas\", () => r.nodos.forEach(n => pm.expect(n.filas).to.eql(1050000)));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cluster",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cluster"
+              ]
+            },
+            "description": "Estado de los 3 nodos ML (TCP)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Usuarios y JWT",
+      "item": [
+        {
+          "name": "Registro de usuario",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"emailUsuario\", \"medico\" + Date.now() + \"@hospital.pe\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Rol usuario y sin contraseña en la respuesta\", () => { const r = pm.response.json(); pm.expect(r.rol).to.eql(\"usuario\"); pm.expect(r).to.not.have.property(\"hash\"); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "registro"
+              ]
+            },
+            "description": "Crea un usuario con rol 'usuario'; la contraseña se guarda con bcrypt.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailUsuario}}\",\n  \"nombre\": \"Dra. Pérez\",\n  \"password\": \"clave-segura-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Registro duplicado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/registro",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "registro"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailUsuario}}\",\n  \"nombre\": \"Dra. Pérez\",\n  \"password\": \"clave-segura-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Token JWT\", () => pm.expect(r.token.split(\".\")).to.have.lengthOf(3));",
+                  "pm.collectionVariables.set(\"tokenUsuario\", r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailUsuario}}\",\n  \"password\": \"clave-segura-123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login administrador",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Rol admin\", () => pm.expect(r.rol).to.eql(\"admin\"));",
+                  "pm.collectionVariables.set(\"token\", r.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "Credenciales del archivo .env (no están en el repositorio): defínelas en el entorno de Postman.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login con contraseña incorrecta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"incorrecta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Predicción (< 100 ms)",
+      "item": [
+        {
+          "name": "Predecir · adulto mayor sin vacuna",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Probabilidad entre 0 y 1\", () => pm.expect(r.probabilidad).to.be.within(0, 1));",
+                  "pm.test(\"Incluye riesgo, factores y aviso\", () => { pm.expect(r.riesgo).to.be.oneOf([\"bajo\", \"medio\", \"alto\"]); pm.expect(r.factores).to.be.an(\"array\").that.is.not.empty; pm.expect(r.aviso).to.be.a(\"string\"); });",
+                  "pm.test(\"Cabecera X-Latencia-ms\", () => pm.response.to.have.header(\"X-Latencia-ms\"));",
+                  "pm.test(\"Riesgo alto\", () => pm.expect(r.riesgo).to.eql(\"alto\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "Hombre de 78 años, sin dosis previas, Lima, primer semestre 2021.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"edad\": 78,\n  \"sexo\": \"M\",\n  \"dosis_previas\": 0,\n  \"fabricante\": \"NINGUNA\",\n  \"departamento\": \"LIMA\",\n  \"periodo\": \"2021-S1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · vacunada en 2022",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Probabilidad entre 0 y 1\", () => pm.expect(r.probabilidad).to.be.within(0, 1));",
+                  "pm.test(\"Incluye riesgo, factores y aviso\", () => { pm.expect(r.riesgo).to.be.oneOf([\"bajo\", \"medio\", \"alto\"]); pm.expect(r.factores).to.be.an(\"array\").that.is.not.empty; pm.expect(r.aviso).to.be.a(\"string\"); });",
+                  "pm.test(\"Cabecera X-Latencia-ms\", () => pm.response.to.have.header(\"X-Latencia-ms\"));",
+                  "pm.test(\"Riesgo bajo\", () => pm.expect(r.riesgo).to.eql(\"bajo\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "Mujer de 45 años, 3 dosis previas Pfizer, Arequipa, 2022+.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"edad\": 45,\n  \"sexo\": \"F\",\n  \"dosis_previas\": 3,\n  \"fabricante\": \"PFIZER\",\n  \"departamento\": \"AREQUIPA\",\n  \"periodo\": \"2022+\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · riesgo intermedio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Probabilidad entre 0 y 1\", () => pm.expect(r.probabilidad).to.be.within(0, 1));",
+                  "pm.test(\"Incluye riesgo, factores y aviso\", () => { pm.expect(r.riesgo).to.be.oneOf([\"bajo\", \"medio\", \"alto\"]); pm.expect(r.factores).to.be.an(\"array\").that.is.not.empty; pm.expect(r.aviso).to.be.a(\"string\"); });",
+                  "pm.test(\"Cabecera X-Latencia-ms\", () => pm.response.to.have.header(\"X-Latencia-ms\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "Hombre de 60 años, 1 dosis Sinopharm, Callao, segundo semestre 2020.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"edad\": 60,\n  \"sexo\": \"M\",\n  \"dosis_previas\": 1,\n  \"fabricante\": \"SINOPHARM\",\n  \"departamento\": \"CALLAO\",\n  \"periodo\": \"2020-S2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · repetido (caché Redis)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Probabilidad entre 0 y 1\", () => pm.expect(r.probabilidad).to.be.within(0, 1));",
+                  "pm.test(\"Incluye riesgo, factores y aviso\", () => { pm.expect(r.riesgo).to.be.oneOf([\"bajo\", \"medio\", \"alto\"]); pm.expect(r.factores).to.be.an(\"array\").that.is.not.empty; pm.expect(r.aviso).to.be.a(\"string\"); });",
+                  "pm.test(\"Cabecera X-Latencia-ms\", () => pm.response.to.have.header(\"X-Latencia-ms\"));",
+                  "pm.test(\"Riesgo alto\", () => pm.expect(r.riesgo).to.eql(\"alto\"));",
+                  "pm.test(\"Respuesta desde la caché de Redis (hit)\", () => pm.expect(r.cache).to.eql(\"hit\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "Misma entrada que la primera: se responde desde Redis (cache = hit).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"edad\": 78,\n  \"sexo\": \"M\",\n  \"dosis_previas\": 0,\n  \"fabricante\": \"NINGUNA\",\n  \"departamento\": \"LIMA\",\n  \"periodo\": \"2021-S1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · faltan campos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Responde en menos de 100 ms\", () => pm.expect(pm.response.responseTime).to.be.below(100));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"edad\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · departamento inválido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"edad\": 78,\n  \"sexo\": \"M\",\n  \"dosis_previas\": 0,\n  \"fabricante\": \"NINGUNA\",\n  \"departamento\": \"MARTE\",\n  \"periodo\": \"2021-S1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · sin JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 415\", () => pm.response.to.have.status(415));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "edad=78",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Predecir · método no permitido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 405\", () => pm.response.to.have.status(405));",
+                  "pm.test(\"Cabecera Allow: POST\", () => pm.expect(pm.response.headers.get(\"Allow\")).to.include(\"POST\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/predecir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predecir"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Entrenamiento distribuido",
+      "item": [
+        {
+          "name": "Entrenar · sin token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entrenar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entrenar"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"epocas\": 100,\n  \"nodos\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Entrenar · usuario sin rol admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 403\", () => pm.response.to.have.status(403));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenUsuario}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entrenar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entrenar"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"epocas\": 100,\n  \"nodos\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Entrenar · 3 nodos, 100 épocas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"Modelo nuevo\", () => pm.expect(r.version).to.be.above(Number(pm.collectionVariables.get(\"versionInicial\"))));",
+                  "pm.test(\"Los 3 nodos atendieron las 100 épocas\", () => { pm.expect(r.nodos_usados).to.eql(3); r.nodos.forEach(n => pm.expect(n.peticiones).to.eql(100)); });",
+                  "pm.test(\"Sin reasignaciones\", () => pm.expect(r.reasignaciones).to.eql(0));",
+                  "pm.test(\"AUC sobre la prueba real > 0.8\", () => pm.expect(r.auc).to.be.above(0.8));",
+                  "pm.collectionVariables.set(\"versionNueva\", r.version);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entrenar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entrenar"
+              ]
+            },
+            "description": "El coordinador reparte el gradiente entre los 3 nodos por TCP; el modelo nuevo se guarda en MongoDB y Redis.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"epocas\": 100,\n  \"tasa\": 1.0,\n  \"nodos\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Entrenar · parámetros inválidos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entrenar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entrenar"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"epocas\": 0,\n  \"nodos\": 9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Modelo tras el entrenamiento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Se activó el modelo nuevo\", () => pm.expect(pm.response.json().version).to.eql(Number(pm.collectionVariables.get(\"versionNueva\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modelo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modelo"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Consultas (MongoDB y métricas)",
+      "item": [
+        {
+          "name": "Historial de entrenamientos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista de entrenamientos desde MongoDB\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenUsuario}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/entrenamientos?limite=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entrenamientos"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Últimas predicciones",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Lista de predicciones desde MongoDB\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenUsuario}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/predicciones?limite=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "predicciones"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Historial sin token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Error en JSON\", () => pm.expect(pm.response.json()).to.have.property(\"error\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/entrenamientos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "entrenamientos"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Métricas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Código 200\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"p95 de /predecir bajo 100 ms\", () => pm.expect(r.latencia_predecir.p95_ms).to.be.below(100));",
+                  "pm.test(\"Conteos de MongoDB\", () => pm.expect(r.mongodb.predicciones).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metricas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metricas"
+              ]
+            },
+            "description": "Latencias de /predecir (p50, p95, p99), caché y conteos de MongoDB y Redis."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "tokenUsuario",
+      "value": ""
+    },
+    {
+      "key": "emailUsuario",
+      "value": ""
+    },
+    {
+      "key": "versionInicial",
+      "value": ""
+    },
+    {
+      "key": "versionNueva",
+      "value": ""
+    }
+  ]
+}
